@@ -10,11 +10,16 @@
 return [
     'realm' => env('KC_REALM', 'galaxis'),
 
-    // URL interne (réseau Docker) pour récupérer les JWKS sans sortir
-    'base_internal' => rtrim(env('KC_BASE_INTERNAL', 'http://keycloak:8080/iam'), '/'),
+    // URL interne (réseau Docker iam-net) pour récupérer les JWKS sans sortir.
+    // v1.1 : Keycloak n'a plus de sous-chemin /iam — caddy-iam route directement
+    // vers keycloak:8080 (racine). Le pont JWT app-php→keycloak utilise HTTP
+    // en interne (pas besoin de TLS sur le réseau Docker).
+    'base_internal' => rtrim(env('KC_BASE_INTERNAL', 'http://keycloak:8080'), '/'),
 
-    // URL publique (vue depuis le navigateur) — sert à valider l'issuer
-    'base_public' => rtrim(env('KC_BASE_PUBLIC', 'http://localhost:8080/iam'), '/'),
+    // URL publique (vue depuis le navigateur du laptop via tunnel SSH) — sert
+    // à valider le claim `iss` du JWT. Doit correspondre EXACTEMENT à ce que
+    // Keycloak émet (hostname + port + protocole).
+    'base_public' => rtrim(env('KC_BASE_PUBLIC', 'https://localhost:8443'), '/'),
 
     'client_id' => env('KC_CLIENT_ID', 'galaxis-portal'),
 
