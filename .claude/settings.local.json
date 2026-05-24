@@ -30,7 +30,9 @@
       "Bash(git fetch *)",
       "Bash(chmod +x backend/docker/entrypoint.sh backend/docker/healthcheck.sh)",
       "Bash(chmod +x scripts/bootstrap.sh)",
-      "Bash(bash -n scripts/bootstrap.sh)"
+      "Bash(bash -n scripts/bootstrap.sh)",
+      "Bash(sed -i 's|curl -fsS\\\\b|curl \"${CURL_OPTS[@]}\"|g' infrastructure/scripts/configure-keycloak.sh)",
+      "Bash(sed -i 's|curl -fso /dev/null|curl \"${CURL_OPTS[@]}\" -o /dev/null|g' infrastructure/scripts/configure-keycloak.sh)"
     ]
   }
 }

@@ -14,12 +14,16 @@
 set -euo pipefail
 
 # ---- Variables (overridables via env)
-KC_URL="${KC_URL:-http://localhost:8080/iam}"
-KC_BOOTSTRAP_ADMIN_USERNAME="${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}"
-KC_BOOTSTRAP_ADMIN_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD:-}"
+# v1.1 : Keycloak est derrière caddy-iam en HTTPS (CA Caddy interne).
+# Le portail React est sur app-caddy HTTPS également.
+# CURL_INSECURE=1 (utilisé par scripts/bootstrap.sh) bypass la vérif TLS
+# pour les certs émis par la CA Caddy locale.
+KC_URL="${KC_URL:-https://localhost:8443}"
+KC_BOOTSTRAP_ADMIN_USERNAME="${KC_BOOTSTRAP_ADMIN_USERNAME:-${KC_ADMIN:-admin}}"
+KC_BOOTSTRAP_ADMIN_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD:-${KC_ADMIN_PASSWORD:-}}"
 REALM="${KC_REALM:-galaxis}"
 CLIENT_ID="${KC_CLIENT_ID:-galaxis-portal}"
-PUBLIC_ORIGIN="${PUBLIC_ORIGIN:-http://localhost:8080}"
+PUBLIC_ORIGIN="${PUBLIC_ORIGIN:-https://localhost:9443}"
 
 # Mot de passe commun pour TOUS les comptes de démo Atelier Marchand
 # (jamais commité dans .env — documenté dans LIVRAISON.md et demo-guide.md)
@@ -33,13 +37,19 @@ DEMO_USER_ADMIN_PASSWORD="${DEMO_USER_ADMIN_PASSWORD:-${DEMO_PASSWORD}}"
 if [ -f "$(dirname "$0")/../../.env" ]; then
   # shellcheck disable=SC1090
   set -a; . "$(dirname "$0")/../../.env"; set +a
-  KC_BOOTSTRAP_ADMIN_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD:-}"
+  # Compat env Phase A (KC_BOOTSTRAP_ADMIN_*) ↔ Phase C (KC_ADMIN_*)
+  KC_BOOTSTRAP_ADMIN_USERNAME="${KC_BOOTSTRAP_ADMIN_USERNAME:-${KC_ADMIN:-admin}}"
+  KC_BOOTSTRAP_ADMIN_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD:-${KC_ADMIN_PASSWORD:-}}"
 fi
 
 if [ -z "${KC_BOOTSTRAP_ADMIN_PASSWORD}" ]; then
-  echo "[configure-keycloak] ERREUR : KC_BOOTSTRAP_ADMIN_PASSWORD doit être défini (env ou .env)" >&2
+  echo "[configure-keycloak] ERREUR : KC_ADMIN_PASSWORD (ou KC_BOOTSTRAP_ADMIN_PASSWORD) doit être défini (env ou .env)" >&2
   exit 1
 fi
+
+# ---- Options curl (TLS strict par défaut, --insecure si CURL_INSECURE=1)
+CURL_OPTS=(-fsS)
+[ "${CURL_INSECURE:-0}" = "1" ] && CURL_OPTS+=(--insecure)
 
 # ---- Helpers
 log()  { printf "\033[36m[configure-keycloak]\033[0m %s\n" "$*"; }
@@ -49,7 +59,7 @@ ok()   { printf "\033[32m[configure-keycloak]\033[0m %s\n" "$*"; }
 
 # ---- 1) Récupère un token admin
 log "Authentification admin sur ${KC_URL}…"
-TOKEN_RESP=$(curl -fsS -X POST "${KC_URL}/realms/master/protocol/openid-connect/token" \
+TOKEN_RESP=$(curl "${CURL_OPTS[@]}" -X POST "${KC_URL}/realms/master/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=password" \
   -d "client_id=admin-cli" \
@@ -66,10 +76,10 @@ AUTH=(-H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json")
 
 # ---- 2) Crée le realm s'il n'existe pas
 log "Vérification du realm '${REALM}'…"
-HTTP=$(curl -fso /dev/null -w "%{http_code}" "${KC_URL}/admin/realms/${REALM}" "${AUTH[@]}" || true)
+HTTP=$(curl "${CURL_OPTS[@]}" -o /dev/null -w "%{http_code}" "${KC_URL}/admin/realms/${REALM}" "${AUTH[@]}" || true)
 if [ "${HTTP}" = "404" ]; then
   log "Création du realm '${REALM}'…"
-  curl -fsS -X POST "${KC_URL}/admin/realms" "${AUTH[@]}" \
+  curl "${CURL_OPTS[@]}" -X POST "${KC_URL}/admin/realms" "${AUTH[@]}" \
     -d "{
       \"realm\": \"${REALM}\",
       \"enabled\": true,
@@ -94,12 +104,12 @@ fi
 
 # ---- 3) Crée le client public PKCE s'il n'existe pas
 log "Vérification du client '${CLIENT_ID}'…"
-CLIENT_LIST=$(curl -fsS "${KC_URL}/admin/realms/${REALM}/clients?clientId=${CLIENT_ID}" "${AUTH[@]}")
+CLIENT_LIST=$(curl "${CURL_OPTS[@]}" "${KC_URL}/admin/realms/${REALM}/clients?clientId=${CLIENT_ID}" "${AUTH[@]}")
 if printf '%s' "${CLIENT_LIST}" | grep -q '"clientId":"'"${CLIENT_ID}"'"'; then
   ok "Client '${CLIENT_ID}' existe déjà"
 else
   log "Création du client public '${CLIENT_ID}' (PKCE S256)…"
-  curl -fsS -X POST "${KC_URL}/admin/realms/${REALM}/clients" "${AUTH[@]}" \
+  curl "${CURL_OPTS[@]}" -X POST "${KC_URL}/admin/realms/${REALM}/clients" "${AUTH[@]}" \
     -d "{
       \"clientId\": \"${CLIENT_ID}\",
       \"name\": \"Galaxis Portal\",
@@ -130,12 +140,12 @@ upsert_realm_role() {
 
   log "Vérification rôle realm '${role_name}'…"
   local http_code
-  http_code=$(curl -fso /dev/null -w "%{http_code}" \
+  http_code=$(curl "${CURL_OPTS[@]}" -o /dev/null -w "%{http_code}" \
     "${KC_URL}/admin/realms/${REALM}/roles/${role_name}" "${AUTH[@]}" || true)
 
   if [ "${http_code}" = "404" ]; then
     log "Création rôle '${role_name}'…"
-    curl -fsS -X POST "${KC_URL}/admin/realms/${REALM}/roles" "${AUTH[@]}" \
+    curl "${CURL_OPTS[@]}" -X POST "${KC_URL}/admin/realms/${REALM}/roles" "${AUTH[@]}" \
       -d "{ \"name\": \"${role_name}\", \"description\": \"${description}\" }"
     ok "Rôle '${role_name}' créé"
   else
@@ -157,13 +167,13 @@ upsert_user() {
 
   log "Vérification user '${username}' (rôle ${role})…"
   local list
-  list=$(curl -fsS "${KC_URL}/admin/realms/${REALM}/users?username=${username}&exact=true" "${AUTH[@]}")
+  list=$(curl "${CURL_OPTS[@]}" "${KC_URL}/admin/realms/${REALM}/users?username=${username}&exact=true" "${AUTH[@]}")
   local id
   id=$(printf '%s' "${list}" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
 
   if [ -z "${id}" ]; then
     log "Création user '${username}'…"
-    curl -fsS -X POST "${KC_URL}/admin/realms/${REALM}/users" "${AUTH[@]}" \
+    curl "${CURL_OPTS[@]}" -X POST "${KC_URL}/admin/realms/${REALM}/users" "${AUTH[@]}" \
       -d "{
         \"username\": \"${username}\",
         \"email\": \"${email}\",
@@ -174,12 +184,12 @@ upsert_user() {
         \"credentials\": [{ \"type\": \"password\", \"value\": \"${password}\", \"temporary\": false }]
       }"
     # Re-lookup pour récupérer l'id fraîchement créé
-    list=$(curl -fsS "${KC_URL}/admin/realms/${REALM}/users?username=${username}&exact=true" "${AUTH[@]}")
+    list=$(curl "${CURL_OPTS[@]}" "${KC_URL}/admin/realms/${REALM}/users?username=${username}&exact=true" "${AUTH[@]}")
     id=$(printf '%s' "${list}" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
     ok "User '${username}' créé (id=${id})"
   else
     log "User '${username}' existe (id=${id}) — reset password (idempotent)"
-    curl -fsS -X PUT "${KC_URL}/admin/realms/${REALM}/users/${id}/reset-password" "${AUTH[@]}" \
+    curl "${CURL_OPTS[@]}" -X PUT "${KC_URL}/admin/realms/${REALM}/users/${id}/reset-password" "${AUTH[@]}" \
       -d "{ \"type\": \"password\", \"value\": \"${password}\", \"temporary\": false }"
     ok "Password de '${username}' réinitialisé"
   fi
@@ -187,8 +197,8 @@ upsert_user() {
   # Assignation du rôle realm (idempotent : Keycloak ignore les ajouts redondants)
   log "Assignation rôle '${role}' à '${username}'…"
   local role_repr
-  role_repr=$(curl -fsS "${KC_URL}/admin/realms/${REALM}/roles/${role}" "${AUTH[@]}")
-  curl -fsS -X POST "${KC_URL}/admin/realms/${REALM}/users/${id}/role-mappings/realm" "${AUTH[@]}" \
+  role_repr=$(curl "${CURL_OPTS[@]}" "${KC_URL}/admin/realms/${REALM}/roles/${role}" "${AUTH[@]}")
+  curl "${CURL_OPTS[@]}" -X POST "${KC_URL}/admin/realms/${REALM}/users/${id}/role-mappings/realm" "${AUTH[@]}" \
     -d "[${role_repr}]" >/dev/null
   ok "Rôle '${role}' assigné à '${username}'"
 }
