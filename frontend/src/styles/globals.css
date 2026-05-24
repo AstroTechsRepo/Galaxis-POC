@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================
+ * Galaxis POC — Styles globaux
+ * DA : fond sombre, gradient bleu→violet, orbes, glassmorphism
+ * ============================================================= */
+
+:root {
+  --violet-dark: #542669;
+  --violet-mid: #7b3e97;
+  --violet-glow: #a76ec8;
+  --blue-dark: #127dc2;
+  --blue-light: #07a9dd;
+  --blue-glow: #60d5ff;
+  --space-black: #07060d;
+  --space-deep: #0d0b1a;
+  --space-card: #14112a;
+  --space-hover: #1a1638;
+}
+
+html,
+body {
+  background: var(--space-deep);
+  color: #fff;
+  min-height: 100vh;
+  font-family: Inter, sans-serif;
+}
+
+body {
+  background-image:
+    radial-gradient(ellipse at 80% 20%, rgba(123, 62, 151, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse at 20% 80%, rgba(18, 125, 194, 0.12) 0%, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* ---- Texte gradient signature (titres) */
+.galaxis-text-gradient {
+  background: linear-gradient(135deg, #07a9dd 0%, #60d5ff 25%, #a76ec8 60%, #7b3e97 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ---- Carte glassmorphism */
+.galaxis-card {
+  background: rgba(20, 17, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(167, 110, 200, 0.18);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.galaxis-card-hover {
+  transition:
+    transform 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+.galaxis-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(96, 213, 255, 0.45);
+  box-shadow: 0 12px 40px rgba(7, 169, 221, 0.18);
+}
+
+/* ---- Bouton signature gradient */
+.galaxis-btn-gradient {
+  background: linear-gradient(135deg, #07a9dd 0%, #7b3e97 100%);
+  color: #fff;
+  font-weight: 500;
+  border-radius: 0.625rem;
+  padding: 0.75rem 1.5rem;
+  transition: filter 200ms ease;
+}
+.galaxis-btn-gradient:hover {
+  filter: brightness(1.1);
+}
+.galaxis-btn-gradient:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---- Bordure dégradée pour les éléments d'accent */
+.galaxis-border-accent {
+  position: relative;
+}
+.galaxis-border-accent::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #07a9dd, #a76ec8);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ---- Orbes flous d'arrière-plan */
+.galaxis-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ---- Mono pour les claims / tokens / hashs */
+.galaxis-mono {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--violet-glow);
+}
+
+/* ---- Scrollbar custom */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--space-deep);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--space-hover);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--violet-dark);
+}

@@ -1,0 +1,12 @@
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	root * /srv
+	encode gzip
+	# SPA fallback : tout ce qui n'est pas un fichier existant → index.html
+	try_files {path} /index.html
+	file_server
+}
