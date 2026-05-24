@@ -1,10 +1,20 @@
 import type { MeResponse } from "@/types/auth";
 
 /*
- * Galaxis POC — Client API minimaliste.
- * Le backend Laravel est sous /api derrière Caddy.
+ * Galaxis POC v1.1 — Client API minimaliste.
+ *
+ * Le backend Laravel est sous /api sur le même origin que le portail
+ * (app-caddy fait le routage handle_path /api/* → php_fastcgi). On
+ * peut donc rester en chemin relatif `/api` côté JS pour bénéficier
+ * de la cohérence d'origine (pas de CORS preflight, cookies same-site).
+ *
+ * VITE_API_URL n'est utilisé que si on souhaite explicitement pointer
+ * vers une URL absolue (ex : front et back déployés séparément).
  */
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE ||
+  "/api";
 
 export interface AuditEntry {
   id: number;
