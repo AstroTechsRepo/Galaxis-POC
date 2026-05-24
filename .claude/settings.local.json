@@ -28,7 +28,9 @@
       "Bash(mkdir -p ~/.ssh)",
       "Bash(chmod 600 ~/.ssh/config)",
       "Bash(git fetch *)",
-      "Bash(chmod +x backend/docker/entrypoint.sh backend/docker/healthcheck.sh)"
+      "Bash(chmod +x backend/docker/entrypoint.sh backend/docker/healthcheck.sh)",
+      "Bash(chmod +x scripts/bootstrap.sh)",
+      "Bash(bash -n scripts/bootstrap.sh)"
     ]
   }
 }
