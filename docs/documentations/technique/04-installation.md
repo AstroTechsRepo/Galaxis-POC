@@ -128,12 +128,31 @@ Première fois :
 make demo
 ```
 
-Ce que ça fait :
-1. `docker compose up -d --build` — construit l'image Laravel et l'image React, démarre les 10 services
-2. Attend que Keycloak passe en `/iam/health/ready`
-3. Lance `./infrastructure/scripts/configure-keycloak.sh` qui crée le realm, le client PKCE, les users démo
+Ce que ça fait, dans l'ordre :
 
-Au bout de **~3 minutes** (premier build), le portail est disponible sur `127.0.0.1:8080` sur la VM.
+1. **`make up`** — `docker compose up -d --build` construit les images custom (Laravel + React), démarre les 10 services, puis attend que Keycloak réponde sur `/iam/health/ready` (jusqu'à 3 min au premier boot).
+2. **`make seed`** — enchaîne :
+   - `configure-keycloak.sh` : crée le realm `galaxis`, le client public PKCE, les rôles realm (`admin`, `user`), et **5 users de démo Atelier Marchand** (cf. table ci-dessous). Idempotent.
+   - `php artisan migrate:fresh --seed --force` : recrée le schéma Laravel et exécute `DemoSeeder` qui **upsert les 5 users** (`marc`, `sophie`, `julien`, `chloe`, `admin`) et **génère ~24 audit_logs** distribués sur les 7 derniers jours.
+
+Au bout de **~3 minutes** (premier build), le portail est disponible sur `127.0.0.1:8080` sur la VM avec un jeu de données démo cohérent.
+
+> 💡 **Idempotence du seed** :
+> - `configure-keycloak.sh` check-then-create (404 sur GET avant POST pour les ressources realm/client/role, lookup `users?username=&exact=true` pour les users)
+> - `DemoSeeder` purge les audit_logs des 5 users avant régénération + upsert sur `username`
+> - `migrate:fresh` est **destructif** sur les tables Laravel mais ne touche pas Keycloak ni Vaultwarden/Nextcloud
+> - Donc **`make seed` est rejouable à volonté** sans casser l'environnement
+
+### Re-seeder à tout moment
+
+```bash
+make seed
+```
+
+Utile si :
+- vous voulez rafraîchir les audit_logs (qui glissent dans le passé au fil des jours)
+- vous avez ajouté/modifié des users démo dans `configure-keycloak.sh` ou `DemoSeeder.php`
+- vous avez fait `make clean` et tout perdu
 
 ---
 
@@ -148,10 +167,23 @@ ssh -L 8080:127.0.0.1:8080 deploy@<vm-ip-ou-fqdn>
 Puis, dans un navigateur sur le laptop :
 - Ouvrir `http://localhost:8080`
 - Cliquer **Se connecter**
-- S'identifier `lucas-test` / `demo`
-- Vous arrivez sur le **dashboard** avec les claims JWT décodés
+- S'identifier **`marc`** / **`Demo2026!`** (le persona principal de la démo — cf. slide 05)
+- Vous arrivez sur le **dashboard** avec « Bienvenue Marc » et les claims JWT décodés
+- Cliquer **Profil** : le journal d'audit affiche ~24 entrées des 7 derniers jours
 
-✅ Si vous voyez ça, c'est fini.
+### Les 5 comptes disponibles
+
+| Username | Rôle | Mot de passe |
+|---|---|---|
+| `marc`   | admin | `Demo2026!` |
+| `sophie` | user  | `Demo2026!` |
+| `julien` | user  | `Demo2026!` |
+| `chloe`  | user  | `Demo2026!` |
+| `admin`  | admin | `Demo2026!` |
+
+(plus les comptes historiques `lucas-test` / `admin-test` également en `Demo2026!`)
+
+✅ Si vous voyez le dashboard avec les claims, c'est fini.
 
 ---
 

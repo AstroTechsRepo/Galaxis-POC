@@ -8,6 +8,19 @@ Toutes les évolutions notables du projet Galaxis POC. Le format suit [Keep a Ch
 
 ### 🚀 Version POC livrable au jury ESGI
 
+#### Phase B (24 mai 2026) — Seeding données de démo
+
+- **Scénario démo « Atelier Marchand »** : TPE de menuiserie 5 personnes, aligné avec le persona Marc (slide 05)
+- **5 comptes alignés Keycloak ↔ Laravel** : `marc` (admin), `sophie` (user), `julien` (user), `chloe` (user), `admin` (admin) — mot de passe partagé `Demo2026!`, jamais commité
+- **2 rôles realm Keycloak** créés : `admin`, `user` (idempotents)
+- **Migration** `add_role_to_users` : colonne `role` (string 32 indexée nullable)
+- **Middleware ValidateJwt** : extraction automatique du rôle depuis `realm_access.roles` au login (admin prime sur user)
+- **Factories** : `UserFactory`, `AuditLogFactory` (5 states : loginSuccess, loginFailure, logout, tokenRefresh, accessDenied)
+- **DemoSeeder** : 5 users explicites (upsert sur username pour idempotence) + ~24 audit_logs distribués sur 7 jours, biais jours ouvrés / 9h-19h
+- **Make targets** : `make seed` (Keycloak + Laravel), `make demo` refactoré en `up + seed`
+- **9 tests Pest** `DemoSeederTest` : 5 users, rôles, fenêtre 8j, idempotence, payloads JSON
+- **Docs mises à jour** : `LIVRAISON.md`, `demo-guide.md`, `technique/04-installation.md`, `README.md`
+
 C'est la version livrée pour la soutenance du 26 juin 2026.
 
 #### Added

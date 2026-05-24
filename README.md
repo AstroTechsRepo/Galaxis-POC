@@ -41,7 +41,9 @@ C'est **tout**.
 - ✅ Pas de modification `/etc/hosts`
 - ✅ Pas de warning navigateur
 
-Connectez-vous avec `lucas-test / demo` et explorez votre orbite.
+Connectez-vous avec **`marc / Demo2026!`** (le persona principal — cf. slide 05) et explorez votre orbite.
+
+> 💡 **5 comptes démo « Atelier Marchand »** disponibles : `marc` (admin), `sophie` (user), `julien` (user), `chloe` (user), `admin` (admin). Mot de passe partagé : `Demo2026!`. Voir [LIVRAISON.md](./LIVRAISON.md) pour le détail.
 
 ---
 
@@ -114,7 +116,8 @@ make lint    # Pint + ESLint + Prettier
 
 | Commande | Fait quoi ? |
 |---|---|
-| `make demo` | Premier démarrage complet, healthy en ~3 min |
+| `make demo` | `up` + `seed` — stack démarrée + jeu de données démo Atelier Marchand prêt (~3 min) |
+| `make seed` | (Re)joue le seed Keycloak + Laravel — idempotent, rejouable à volonté |
 | `make up` / `make down` / `make restart` | Cycle de vie sans rebuild |
 | `make logs` | Suit les logs de toute la stack |
 | `make test` | Pest + Vitest avec couverture |

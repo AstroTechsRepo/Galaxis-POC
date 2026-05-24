@@ -13,9 +13,12 @@
 | ☐ | Sur la VM : `docker compose ps` → tous les conteneurs `Up (healthy)` ou `Up` |
 | ☐ | Sur le laptop : `ssh -L 8080:127.0.0.1:8080 user@<VM_IP>` → test tunnel |
 | ☐ | Sur le laptop : ouvrir `http://localhost:8080` → landing visible |
-| ☐ | Tester un login complet `lucas-test / demo` → dashboard apparaît |
+| ☐ | Lancer `make seed` une dernière fois → 5 users + ~24 audit_logs prêts |
+| ☐ | Tester un login complet `marc / Demo2026!` → dashboard avec « Bienvenue Marc » |
+| ☐ | Vérifier l'audit log : sur la page Profil, le journal affiche ~24 entrées |
 | ☐ | Cliquer la carte **Vaultwarden** → s'ouvre dans un nouvel onglet |
 | ☐ | Cliquer la carte **Nextcloud** → s'ouvre dans un nouvel onglet |
+| ☐ | Tester aussi `sophie / Demo2026!` pour démontrer le RBAC (rôle user) |
 | ☐ | Préparer une vidéo de démo locale (plan B) — captures écran de chaque étape |
 | ☐ | Charger la batterie laptop à 100 % + adaptateur HDMI + souris |
 | ☐ | Mettre la slide de présentation en plein écran F11 dans Chrome/Firefox |
@@ -50,11 +53,12 @@ curl -s http://127.0.0.1:8080/api/health | jq .
 
 1. Browser : `http://localhost:8080` → **landing avec gradient**
 2. Cliquer **Se connecter** → redirection vers Keycloak (URL `/iam/.../auth`)
-3. Login `lucas-test / demo`
-4. Retour automatique sur `/dashboard`
+3. Login **`marc / Demo2026!`** (le persona du discours)
+4. Retour automatique sur `/dashboard` → **« Bienvenue Marc »**
 5. Montrer les **claims décodés** dans le tableau du bas
+6. Cliquer **Profil** → montrer le journal d'audit (~24 entrées des 7 derniers jours, dont 1 login_failure de Julien et 1 access_denied de Chloé)
 
-> *« Le flow : code + PKCE, échange du code, JWT RS256 validé serveur contre les JWKS de Keycloak en cache Redis. Le tableau du bas montre ce que le backend a lu et accepté. »*
+> *« Le flow : code + PKCE, échange du code, JWT RS256 validé serveur contre les JWKS de Keycloak en cache Redis. Le tableau du bas montre ce que le backend a lu et accepté. L'audit log montre que toute l'équipe d'Atelier Marchand est tracée — y compris les tentatives ratées. »*
 
 ### Étape 4 — Vaultwarden (~30 s)
 
@@ -76,13 +80,36 @@ docker network inspect galaxis-services-net | jq '.[0].Containers | keys'
 
 ---
 
+## 🎭 Comptes utilisables pendant la démo
+
+Le jeu de données « Atelier Marchand » est seedé automatiquement par `make seed` (lui-même invoqué par `make demo`). 5 comptes alignés Keycloak ↔ Laravel :
+
+| Username | Email | Rôle | Quand l'utiliser dans la démo |
+|---|---|---|---|
+| **`marc`** ⭐    | `marc@atelier-marchand.demo`   | `admin` | **Démo principale** — c'est le persona du discours (slide 05). Dashboard, claims, audit log → tout est cohérent narrativement. |
+| `sophie`         | `sophie@atelier-marchand.demo` | `user`  | Pour démontrer le **RBAC** : son token n'a pas le rôle admin, donc certaines actions seraient refusées (cf. son `access_denied` dans l'audit). |
+| `julien`         | `julien@atelier-marchand.demo` | `user`  | Le seul user avec un `login_failure` dans l'audit log — utile pour montrer la traçabilité des tentatives ratées. |
+| `chloe`          | `chloe@atelier-marchand.demo`  | `user`  | Sa tentative d'accès à `/admin/users` apparaît en `access_denied`. |
+| `admin`          | `admin@galaxis.demo`           | `admin` | Compte technique, à présenter si on veut un 2e admin distinct de Marc. |
+
+**Mot de passe partagé pour les 5 comptes** : `Demo2026!`
+
+> 💡 **Recommandation séquence** :
+> 1. **Démo principale** = login avec **`marc`** (le persona, le dashboard, les claims, l'audit log avec ses 6 connexions de la semaine)
+> 2. **Bonus RBAC** = se déconnecter, login avec **`sophie`** → montrer qu'elle voit les mêmes cartes mais que côté backend son rôle est `user` (`/api/me` retourne `"role":"user"`)
+>
+> ⚠️ **POC démo uniquement** : le mot de passe partagé `Demo2026!` n'est pas une pratique prod. Documenté dans `LIVRAISON.md`.
+
+---
+
 ## ⚠️ Points de vigilance
 
 | Risque | Que faire ? |
 |---|---|
 | Le tunnel SSH lâche | Refaire `ssh -L 8080:...` immédiatement, le navigateur va re-tenir |
 | Healthcheck rouge sur un conteneur | `docker compose restart <service>` puis attendre |
-| Login échoue | Vérifier que le mot de passe `.env` correspond à ce qui a été passé au script `configure-keycloak.sh` |
+| Login échoue | Vérifier que `make seed` a bien tourné (5 users Keycloak + 5 users Laravel + ~24 logs). Sinon relancer : `make seed`. |
+| L'audit log est vide | `make seed` n'a pas fini ou a échoué côté Laravel. Relancer : `make seed`. |
 | Le browser garde un cache trop ancien | Ctrl+Shift+R pour forcer le rechargement |
 | `make demo` n'a jamais été relancé après un reboot | `cd /opt/galaxis && make up` (sans rebuild) |
 

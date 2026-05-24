@@ -193,12 +193,39 @@ xdg-open http://localhost:8080
 # ou ouvrir manuellement http://localhost:8080
 ```
 
-### Login démo
+### 🎭 Comptes de démo « Atelier Marchand »
 
-| User | Password |
-|---|---|
-| `lucas-test` | `demo` |
-| `admin-test` | `demo` |
+Le seeder `make seed` (lancé automatiquement par `make demo`) crée le scénario d'une TPE de menuiserie de 5 personnes, aligné avec le persona Marc de la slide 05. Les 5 comptes existent **dans Keycloak ET dans Laravel** (synchronisés au premier login OIDC réel) :
+
+| Username | Email | Prénom / Nom | Rôle | Profil démo |
+|---|---|---|---|---|
+| **`marc`**   | `marc@atelier-marchand.demo`   | Marc Marchand   | `admin` | 🎯 **Compte recommandé pour la démo principale** — persona slide 05 |
+| `sophie` | `sophie@atelier-marchand.demo` | Sophie Lemoine  | `user`  | Comptable mi-temps — utile pour démontrer le RBAC |
+| `julien` | `julien@atelier-marchand.demo` | Julien Petit    | `user`  | Apprenti menuisier |
+| `chloe`  | `chloe@atelier-marchand.demo`  | Chloé Dubois    | `user`  | Commerciale terrain — son `access_denied` apparaît dans l'audit log |
+| `admin`  | `admin@galaxis.demo`           | Admin Galaxis   | `admin` | Compte technique |
+
+**Mot de passe partagé pour TOUS les comptes** : `Demo2026!`
+
+> ⚠️ **POC démo uniquement.** Ce mot de passe partagé n'est pas une pratique de production. Il est documenté ici et dans `docs/documentations/demo-guide.md`, **jamais commité dans `.env`**. Il est injecté à l'exécution via la variable `DEMO_PASSWORD` (cf. `infrastructure/scripts/configure-keycloak.sh`).
+
+#### Données pré-seedées (après `make seed`)
+
+- **5 users** dans la table Laravel `users` (alignés 1-pour-1 avec Keycloak)
+- **~24 audit_logs** distribués sur les 7 derniers jours, biaisés jours ouvrés / 9h-19h :
+  - Marc : 6 `login_success`
+  - Sophie : 3 `login_success` + 1 `logout`
+  - Julien : 4 `login_success` + 1 `login_failure`
+  - Chloé : 3 `login_success` + 1 `access_denied` (tentative `/admin/users`)
+  - Admin : 2 `login_success`
+- **2 rôles realm Keycloak** : `admin`, `user`
+
+#### Comptes historiques (compatibilité v1.0)
+
+| User | Password | Note |
+|---|---|---|
+| `lucas-test` | `Demo2026!` | Conservé pour rétro-compat |
+| `admin-test` | `Demo2026!` | Conservé pour rétro-compat |
 
 ---
 
