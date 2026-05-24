@@ -1,0 +1,52 @@
+# ============================================================
+# Galaxis POC v1.1 — Caddyfile TIER IAM
+# Frontal HTTPS du tier identité (réseau galaxis-iam-net)
+# Reverse proxy vers Keycloak (port 8080 interne)
+# TLS terminé ici via CA locale Caddy (tls internal)
+# ============================================================
+
+{
+	# Pas de redirection auto HTTP→HTTPS — Caddy ne sert que sur 443
+	auto_https disable_redirects
+	# La CA Caddy interne génère un cert valide pour les SAN ci-dessous
+	local_certs
+	# Logs structurés JSON sur stdout
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+# ----------------------------------------------------------------
+# Hôte canonique : galaxis-iam (vu depuis les autres services)
+# + alias localhost (vu depuis le navigateur du laptop via tunnel SSH)
+# ----------------------------------------------------------------
+galaxis-iam:443, localhost:443 {
+	tls internal
+
+	encode gzip zstd
+
+	# Headers de sécurité — pas de HSTS strict car CA locale = warning attendu
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Endpoint de récupération du CA Caddy pour import navigateur (optionnel)
+	# Permet à Lucas de pré-importer le CA en pré-démo pour 0 warning
+	handle /_ca.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		file_server
+	}
+
+	# Tout le reste → Keycloak (port HTTP interne 8080)
+	reverse_proxy keycloak:8080 {
+		header_up X-Forwarded-Proto "https"
+		header_up X-Forwarded-Port "8443"
+		header_up X-Forwarded-Host "localhost:8443"
+	}
+}

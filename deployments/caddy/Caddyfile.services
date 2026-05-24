@@ -1,0 +1,85 @@
+# ============================================================
+# Galaxis POC v1.1 — Caddyfile TIER SERVICES
+# Frontal HTTPS du tier briques métier (réseau galaxis-services-net)
+# - 443 → Vaultwarden (galaxis-vault)
+# - 444 → Nextcloud   (galaxis-cloud)
+# TLS terminé ici via CA locale Caddy (tls internal)
+# ============================================================
+
+{
+	auto_https disable_redirects
+	local_certs
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+# ----------------------------------------------------------------
+# Vaultwarden — port 443 interne (mappé 127.0.0.1:10443 sur la VM)
+# ----------------------------------------------------------------
+galaxis-vault:443, localhost:443 {
+	tls internal
+
+	encode gzip zstd
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	handle /_ca.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		file_server
+	}
+
+	# WebSocket Vaultwarden (notifications hub) — réécriture vers port 3012
+	reverse_proxy /notifications/hub vaultwarden:3012
+
+	# Tout le reste → Vaultwarden HTTP (port 80 interne)
+	reverse_proxy vaultwarden:80 {
+		header_up X-Forwarded-Proto "https"
+		header_up X-Forwarded-Port "10443"
+		header_up X-Forwarded-Host "localhost:10443"
+	}
+}
+
+# ----------------------------------------------------------------
+# Nextcloud — port 444 interne (mappé 127.0.0.1:11443 sur la VM)
+# ----------------------------------------------------------------
+galaxis-cloud:444, localhost:444 {
+	tls internal
+
+	encode gzip zstd
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=15552000; includeSubDomains"
+		-Server
+	}
+
+	# Redirections recommandées par Nextcloud pour la découverte DAV
+	redir /.well-known/carddav /remote.php/dav/ 301
+	redir /.well-known/caldav /remote.php/dav/ 301
+	redir /.well-known/webfinger /index.php/.well-known/webfinger 301
+	redir /.well-known/nodeinfo /index.php/.well-known/nodeinfo 301
+
+	handle /_ca.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		file_server
+	}
+
+	reverse_proxy nextcloud:80 {
+		header_up X-Forwarded-Proto "https"
+		header_up X-Forwarded-Port "11443"
+		header_up X-Forwarded-Host "localhost:11443"
+		header_up X-Forwarded-For {remote_host}
+	}
+}
