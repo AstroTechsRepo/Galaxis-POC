@@ -3,7 +3,7 @@
 # Cibles principales : demo, up, down, install, test, lint, seed, logs
 # ============================================================
 
-.PHONY: help demo up down restart install test lint seed logs ps clean \
+.PHONY: help demo up down restart install test lint seed seed-fresh logs ps clean \
         configure-keycloak backend-shell front-shell caddy-reload \
         ansible-prereqs ansible-iam ansible-app ansible-services ansible-all
 
@@ -27,23 +27,22 @@ help: ## Affiche cette aide
 # Démo / Lifecycle Docker
 # ----------------------------------------------------------------
 
-demo: ## Démarre toute la stack POC (idempotent)
-	@printf "$(CYAN)→ Galaxis POC — démarrage complet$(RESET)\n"
+demo: up seed ## Démarre la stack + seed démo (Keycloak + Laravel) en une commande
+	@printf "$(GREEN)╔══════════════════════════════════════════════════════════════╗$(RESET)\n"
+	@printf "$(GREEN)║  Galaxis POC est prêt — scénario Atelier Marchand$(RESET)             $(GREEN)║$(RESET)\n"
+	@printf "$(GREEN)║  $(RESET)Sur le laptop : $(CYAN)ssh -L 8080:127.0.0.1:8080 user@<VM_IP>$(RESET) $(GREEN)║$(RESET)\n"
+	@printf "$(GREEN)║  $(RESET)Puis ouvrir : $(CYAN)http://localhost:8080$(RESET)                      $(GREEN)║$(RESET)\n"
+	@printf "$(GREEN)║  $(RESET)Comptes : $(CYAN)marc · sophie · julien · chloe · admin$(RESET)         $(GREEN)║$(RESET)\n"
+	@printf "$(GREEN)║  $(RESET)Mot de passe partagé : $(CYAN)Demo2026!$(RESET)                        $(GREEN)║$(RESET)\n"
+	@printf "$(GREEN)╚══════════════════════════════════════════════════════════════╝$(RESET)\n"
+
+up: ## Démarre la stack (build si besoin) + attend Keycloak ready
+	@printf "$(CYAN)→ Galaxis POC — démarrage stack$(RESET)\n"
 	@test -f .env || (printf "$(YELLOW)Création de .env depuis .env.example$(RESET)\n" && cp .env.example .env)
 	docker compose up -d --build
 	@printf "$(GREEN)✓ Stack démarrée$(RESET)\n"
 	@printf "$(CYAN)→ Attente que Keycloak soit prêt (peut prendre ~60s)…$(RESET)\n"
 	@./infrastructure/scripts/wait-for-keycloak.sh || true
-	@printf "$(CYAN)→ Configuration Keycloak (idempotent)$(RESET)\n"
-	@./infrastructure/scripts/configure-keycloak.sh
-	@printf "$(GREEN)╔══════════════════════════════════════════════════════════════╗$(RESET)\n"
-	@printf "$(GREEN)║  Galaxis POC est prêt$(RESET)                                        $(GREEN)║$(RESET)\n"
-	@printf "$(GREEN)║  $(RESET)Sur le laptop : $(CYAN)ssh -L 8080:127.0.0.1:8080 user@<VM_IP>$(RESET) $(GREEN)║$(RESET)\n"
-	@printf "$(GREEN)║  $(RESET)Puis ouvrir : $(CYAN)http://localhost:8080$(RESET)                      $(GREEN)║$(RESET)\n"
-	@printf "$(GREEN)╚══════════════════════════════════════════════════════════════╝$(RESET)\n"
-
-up: ## Démarre la stack sans rebuild ni configuration
-	docker compose up -d
 
 down: ## Arrête tous les conteneurs (volumes conservés)
 	docker compose down
@@ -91,9 +90,16 @@ lint: ## PHP-CS-Fixer + ESLint + Prettier
 # Backend / Keycloak helpers
 # ----------------------------------------------------------------
 
-seed: ## Lance migrations + seeders Laravel
-	docker compose exec app-php php artisan migrate --force
-	docker compose exec app-php php artisan db:seed --force
+seed: ## Peuple Keycloak (5 users + rôles) puis Laravel (users + ~24 audit_logs)
+	@printf "$(PURPLE)🌱 Seeding Keycloak users + rôles…$(RESET)\n"
+	@./infrastructure/scripts/configure-keycloak.sh
+	@printf "$(PURPLE)🌱 Seeding Laravel database (migrate:fresh --seed)…$(RESET)\n"
+	docker compose exec -T app-php php artisan migrate:fresh --seed --force
+	@printf "$(GREEN)✅ Démo Atelier Marchand prête — comptes :$(RESET)\n"
+	@printf "   $(CYAN)marc$(RESET) (admin), $(CYAN)sophie$(RESET) (user), $(CYAN)julien$(RESET) (user), $(CYAN)chloe$(RESET) (user), $(CYAN)admin$(RESET) (admin)\n"
+	@printf "   Mot de passe partagé : $(CYAN)Demo2026!$(RESET)\n"
+
+seed-fresh: seed ## Alias rétro-compatible : équivalent à 'make seed'
 
 configure-keycloak: ## (Re)joue le script de configuration Keycloak (idempotent)
 	./infrastructure/scripts/configure-keycloak.sh

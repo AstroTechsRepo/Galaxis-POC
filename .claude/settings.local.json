@@ -11,7 +11,8 @@
       "Bash(grep -i -E \"\\\\.env$|secret|password|credential\")",
       "Bash(grep -c \"if \\\\[ \\\\\"\\\\${HTTP}\\\\\" = \\\\\"404\\\\\" \\\\]\\\\|if printf.*grep -q\\\\|if \\\\[ -z \\\\\"\\\\${id}\\\\\" \\\\]\" infrastructure/scripts/configure-keycloak.sh)",
       "Bash(git tag -a v1.0-soutenance -m 'Galaxis POC v1.0-soutenance — livraison jury ESGI *)",
-      "Bash(bash -n infrastructure/scripts/configure-keycloak.sh)"
+      "Bash(bash -n infrastructure/scripts/configure-keycloak.sh)",
+      "Bash(make help *)"
     ]
   }
 }
