@@ -78,9 +78,28 @@ class ValidateJwt
                 'email'      => (string) ($claims['email'] ?? ''),
                 'first_name' => (string) ($claims['given_name'] ?? ''),
                 'last_name'  => (string) ($claims['family_name'] ?? ''),
+                'role'       => $this->extractRole($claims),
                 'last_login_at' => now(),
             ],
         );
+    }
+
+    /**
+     * Extrait le rôle applicatif depuis `realm_access.roles`.
+     * 'admin' prime sur 'user' si les deux sont présents.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    private function extractRole(array $claims): string
+    {
+        $roles = (array) data_get($claims, 'realm_access.roles', []);
+        if (in_array('admin', $roles, true)) {
+            return 'admin';
+        }
+        if (in_array('user', $roles, true)) {
+            return 'user';
+        }
+        return 'user';
     }
 
     private function reject(Request $request, string $code, string $message): Response

@@ -21,6 +21,7 @@ class User extends Model
         'email',
         'first_name',
         'last_name',
+        'role',
         'last_login_at',
     ];
 
@@ -29,5 +30,15 @@ class User extends Model
         return [
             'last_login_at' => 'datetime',
         ];
+    }
+
+    public function auditLogs()
+    {
+        return $this->hasMany(AuditLog::class);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
     }
 }
