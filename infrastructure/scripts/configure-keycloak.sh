@@ -6,7 +6,9 @@
 # Crée :
 #   - Realm `galaxis` (si absent)
 #   - Client public `galaxis-portal` avec PKCE S256 (si absent)
-#   - Users de démo : lucas-test, admin-test (si absents)
+#   - Rôles realm : admin, user (si absents)
+#   - Users de démo Atelier Marchand (5) + comptes hérités (2)
+#   - Assignation du rôle admin/user à chaque user
 # Toutes les actions sont protégées par un check d'existence préalable.
 # ============================================================
 set -euo pipefail
@@ -19,8 +21,13 @@ REALM="${KC_REALM:-galaxis}"
 CLIENT_ID="${KC_CLIENT_ID:-galaxis-portal}"
 PUBLIC_ORIGIN="${PUBLIC_ORIGIN:-http://localhost:8080}"
 
-DEMO_USER_LUCAS_PASSWORD="${DEMO_USER_LUCAS_PASSWORD:-demo}"
-DEMO_USER_ADMIN_PASSWORD="${DEMO_USER_ADMIN_PASSWORD:-demo}"
+# Mot de passe commun pour TOUS les comptes de démo Atelier Marchand
+# (jamais commité dans .env — documenté dans LIVRAISON.md et demo-guide.md)
+DEMO_PASSWORD="${DEMO_PASSWORD:-Demo2026!}"
+
+# Hérités v1.0 — gardés en compatibilité, écraseront si DEMO_USER_*_PASSWORD défini
+DEMO_USER_LUCAS_PASSWORD="${DEMO_USER_LUCAS_PASSWORD:-${DEMO_PASSWORD}}"
+DEMO_USER_ADMIN_PASSWORD="${DEMO_USER_ADMIN_PASSWORD:-${DEMO_PASSWORD}}"
 
 # Source .env si présent à la racine du projet
 if [ -f "$(dirname "$0")/../../.env" ]; then
@@ -116,15 +123,39 @@ else
   ok "Client '${CLIENT_ID}' créé"
 fi
 
-# ---- 4) Helper : crée ou met à jour un user
+# ---- 4) Rôles realm : admin, user (idempotent)
+upsert_realm_role() {
+  local role_name="$1"
+  local description="$2"
+
+  log "Vérification rôle realm '${role_name}'…"
+  local http_code
+  http_code=$(curl -fso /dev/null -w "%{http_code}" \
+    "${KC_URL}/admin/realms/${REALM}/roles/${role_name}" "${AUTH[@]}" || true)
+
+  if [ "${http_code}" = "404" ]; then
+    log "Création rôle '${role_name}'…"
+    curl -fsS -X POST "${KC_URL}/admin/realms/${REALM}/roles" "${AUTH[@]}" \
+      -d "{ \"name\": \"${role_name}\", \"description\": \"${description}\" }"
+    ok "Rôle '${role_name}' créé"
+  else
+    ok "Rôle '${role_name}' existe déjà"
+  fi
+}
+
+upsert_realm_role "admin" "Administrateur Galaxis — accès complet"
+upsert_realm_role "user"  "Utilisateur Galaxis — accès standard"
+
+# ---- 5) Helper : crée ou met à jour un user, puis assigne un rôle realm
 upsert_user() {
   local username="$1"
   local email="$2"
   local first="$3"
   local last="$4"
   local password="$5"
+  local role="${6:-user}"   # par défaut "user", peut être "admin"
 
-  log "Vérification user '${username}'…"
+  log "Vérification user '${username}' (rôle ${role})…"
   local list
   list=$(curl -fsS "${KC_URL}/admin/realms/${REALM}/users?username=${username}&exact=true" "${AUTH[@]}")
   local id
@@ -142,17 +173,35 @@ upsert_user() {
         \"enabled\": true,
         \"credentials\": [{ \"type\": \"password\", \"value\": \"${password}\", \"temporary\": false }]
       }"
-    ok "User '${username}' créé"
+    # Re-lookup pour récupérer l'id fraîchement créé
+    list=$(curl -fsS "${KC_URL}/admin/realms/${REALM}/users?username=${username}&exact=true" "${AUTH[@]}")
+    id=$(printf '%s' "${list}" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
+    ok "User '${username}' créé (id=${id})"
   else
     log "User '${username}' existe (id=${id}) — reset password (idempotent)"
     curl -fsS -X PUT "${KC_URL}/admin/realms/${REALM}/users/${id}/reset-password" "${AUTH[@]}" \
       -d "{ \"type\": \"password\", \"value\": \"${password}\", \"temporary\": false }"
     ok "Password de '${username}' réinitialisé"
   fi
+
+  # Assignation du rôle realm (idempotent : Keycloak ignore les ajouts redondants)
+  log "Assignation rôle '${role}' à '${username}'…"
+  local role_repr
+  role_repr=$(curl -fsS "${KC_URL}/admin/realms/${REALM}/roles/${role}" "${AUTH[@]}")
+  curl -fsS -X POST "${KC_URL}/admin/realms/${REALM}/users/${id}/role-mappings/realm" "${AUTH[@]}" \
+    -d "[${role_repr}]" >/dev/null
+  ok "Rôle '${role}' assigné à '${username}'"
 }
 
-# ---- 5) Users de démo
-upsert_user "lucas-test" "lucas-test@galaxis.local" "Lucas"  "Test"  "${DEMO_USER_LUCAS_PASSWORD}"
-upsert_user "admin-test" "admin-test@galaxis.local" "Admin"  "Test"  "${DEMO_USER_ADMIN_PASSWORD}"
+# ---- 6) Users de démo « Atelier Marchand » (TPE menuiserie 5 personnes — slide 05)
+upsert_user "marc"   "marc@atelier-marchand.demo"   "Marc"   "Marchand" "${DEMO_PASSWORD}" "admin"
+upsert_user "sophie" "sophie@atelier-marchand.demo" "Sophie" "Lemoine"  "${DEMO_PASSWORD}" "user"
+upsert_user "julien" "julien@atelier-marchand.demo" "Julien" "Petit"    "${DEMO_PASSWORD}" "user"
+upsert_user "chloe"  "chloe@atelier-marchand.demo"  "Chloé"  "Dubois"   "${DEMO_PASSWORD}" "user"
+upsert_user "admin"  "admin@galaxis.demo"           "Admin"  "Galaxis"  "${DEMO_PASSWORD}" "admin"
 
-ok "Configuration Keycloak terminée — realm='${REALM}', client='${CLIENT_ID}', 2 users de démo"
+# ---- 7) Comptes historiques (compatibilité avec la doc v1.0 initiale)
+upsert_user "lucas-test" "lucas-test@galaxis.local" "Lucas" "Test"  "${DEMO_USER_LUCAS_PASSWORD}" "user"
+upsert_user "admin-test" "admin-test@galaxis.local" "Admin" "Test"  "${DEMO_USER_ADMIN_PASSWORD}" "admin"
+
+ok "Configuration Keycloak terminée — realm='${REALM}', client='${CLIENT_ID}', 5 users démo + 2 hérités"

@@ -9,7 +9,9 @@
       "Bash(chmod +x infrastructure/scripts/configure-keycloak.sh)",
       "Bash(grep -rn -E '\\(password|secret|token|key\\)\\\\s*=\\\\s*['\\\\''\"][^'\\\\''\"]{4,}' --include=*.php --include=*.ts --include=*.tsx --include=*.yml --include=*.yaml --include=*.json --include=*.sh --include=*.conf --include=Caddyfile --include=Makefile --include=Dockerfile --include=*.md --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git --exclude-dir=docs/soutenance .)",
       "Bash(grep -i -E \"\\\\.env$|secret|password|credential\")",
-      "Bash(grep -c \"if \\\\[ \\\\\"\\\\${HTTP}\\\\\" = \\\\\"404\\\\\" \\\\]\\\\|if printf.*grep -q\\\\|if \\\\[ -z \\\\\"\\\\${id}\\\\\" \\\\]\" infrastructure/scripts/configure-keycloak.sh)"
+      "Bash(grep -c \"if \\\\[ \\\\\"\\\\${HTTP}\\\\\" = \\\\\"404\\\\\" \\\\]\\\\|if printf.*grep -q\\\\|if \\\\[ -z \\\\\"\\\\${id}\\\\\" \\\\]\" infrastructure/scripts/configure-keycloak.sh)",
+      "Bash(git tag -a v1.0-soutenance -m 'Galaxis POC v1.0-soutenance — livraison jury ESGI *)",
+      "Bash(bash -n infrastructure/scripts/configure-keycloak.sh)"
     ]
   }
 }
