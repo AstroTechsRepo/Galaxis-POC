@@ -27,7 +27,8 @@
       "Bash(ssh-keygen -lf ~/.ssh/id_ed25519.pub)",
       "Bash(mkdir -p ~/.ssh)",
       "Bash(chmod 600 ~/.ssh/config)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(chmod +x backend/docker/entrypoint.sh backend/docker/healthcheck.sh)"
     ]
   }
 }

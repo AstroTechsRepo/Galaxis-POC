@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
-# Galaxis POC - entrypoint backend
+# Galaxis POC v1.1 — entrypoint php-fpm
 set -euo pipefail
 
 cd /var/www/html
 
-# Génère APP_KEY si absent (dev/local seulement)
-if [ -z "${APP_KEY:-}" ] && [ -f .env ]; then
-  if ! grep -q "^APP_KEY=base64:" .env; then
-    php artisan key:generate --force --no-interaction
+# ---- Permissions storage/cache (mount du repo en bind monte avec UID hôte)
+chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
+
+# ---- APP_KEY auto-gen si absent (dev only)
+if [ -z "${APP_KEY:-}" ]; then
+  if [ "${APP_ENV:-production}" != "production" ] && [ -w .env ] 2>/dev/null; then
+    php artisan key:generate --force --no-interaction || true
   fi
 fi
 
-# Migrations idempotentes
-if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+# ---- Migrations idempotentes au boot (désactivable via RUN_MIGRATIONS=false)
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
   echo "[entrypoint] Lancement des migrations…"
   php artisan migrate --force --no-interaction || true
 fi
 
-# Cache de config en prod
+# ---- Caches de prod
 if [ "${APP_ENV:-production}" = "production" ]; then
   php artisan config:cache || true
   php artisan route:cache  || true
+  php artisan view:cache   || true
 fi
 
 exec "$@"
