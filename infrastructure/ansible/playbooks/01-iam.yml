@@ -1,0 +1,59 @@
+---
+# ============================================================
+# Galaxis POC — Playbook 01 : déploiement IAM (Keycloak)
+# Idempotent. Joue ensuite configure-keycloak.sh.
+# ============================================================
+- name: "Galaxis POC — stack IAM"
+  hosts: galaxis_vm
+  become: true
+  gather_facts: false
+
+  vars:
+    stack_dir: "{{ galaxis_app_dir }}/deployments/iam"
+
+  tasks:
+
+    - name: "IAM — vérifier que .env racine existe"
+      ansible.builtin.stat:
+        path: "{{ galaxis_app_dir }}/.env"
+      register: env_file
+
+    - name: "IAM — copier .env.example en .env si manquant (à compléter manuellement après)"
+      ansible.builtin.copy:
+        src: "{{ galaxis_app_dir }}/.env.example"
+        dest: "{{ galaxis_app_dir }}/.env"
+        remote_src: true
+        force: false
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+      when: not env_file.stat.exists
+
+    - name: "IAM — docker compose up -d (stack iam)"
+      ansible.builtin.command:
+        cmd: docker compose --env-file {{ galaxis_app_dir }}/.env up -d
+        chdir: "{{ stack_dir }}"
+      register: compose_up
+      changed_when: "'Started' in compose_up.stderr or 'Created' in compose_up.stderr"
+
+    - name: "IAM — attendre que Keycloak réponde sur /iam/health/ready"
+      ansible.builtin.shell: |
+        for i in $(seq 1 60); do
+          if curl -fsS http://127.0.0.1:8080/iam/health/ready -o /dev/null --connect-timeout 2 2>/dev/null; then exit 0; fi
+          sleep 3
+        done
+        exit 1
+      register: kc_wait
+      changed_when: false
+      failed_when: kc_wait.rc != 0
+
+    - name: "IAM — exécuter configure-keycloak.sh (idempotent)"
+      ansible.builtin.shell: |
+        set -a; . {{ galaxis_app_dir }}/.env; set +a
+        {{ galaxis_app_dir }}/infrastructure/scripts/configure-keycloak.sh
+      register: kc_conf
+      changed_when: "'créé' in kc_conf.stdout or 'created' in kc_conf.stdout.lower()"
+
+    - name: "IAM — résumé"
+      ansible.builtin.debug:
+        msg: "Stack IAM déployée. Realm + client + users démo OK."

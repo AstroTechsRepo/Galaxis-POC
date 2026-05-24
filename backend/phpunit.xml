@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         processIsolation="false"
+         stopOnFailure="false"
+         cacheDirectory=".phpunit.cache"
+         backupGlobals="false"
+         backupStaticProperties="false">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <coverage>
+        <report>
+            <text outputFile="php://stdout" showOnlySummary="true"/>
+        </report>
+    </coverage>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:Wj4XJp1F0qZJ4r6jK0eRTb9Q9bN6vH3Yr8M0nU+sLpY="/>
+        <env name="APP_DEBUG" value="true"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="LOG_CHANNEL" value="single"/>
+        <env name="KC_REALM" value="galaxis"/>
+        <env name="KC_BASE_INTERNAL" value="http://keycloak.test/iam"/>
+        <env name="KC_BASE_PUBLIC" value="http://localhost:8080/iam"/>
+        <env name="KC_CLIENT_ID" value="galaxis-portal"/>
+        <env name="JWKS_CACHE_TTL" value="300"/>
+    </php>
+</phpunit>
