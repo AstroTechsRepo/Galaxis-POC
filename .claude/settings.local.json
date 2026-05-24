@@ -12,7 +12,22 @@
       "Bash(grep -c \"if \\\\[ \\\\\"\\\\${HTTP}\\\\\" = \\\\\"404\\\\\" \\\\]\\\\|if printf.*grep -q\\\\|if \\\\[ -z \\\\\"\\\\${id}\\\\\" \\\\]\" infrastructure/scripts/configure-keycloak.sh)",
       "Bash(git tag -a v1.0-soutenance -m 'Galaxis POC v1.0-soutenance — livraison jury ESGI *)",
       "Bash(bash -n infrastructure/scripts/configure-keycloak.sh)",
-      "Bash(make help *)"
+      "Bash(make help *)",
+      "Read(//home/user/.ssh/**)",
+      "Bash(ssh-add -L)",
+      "Bash(which gh *)",
+      "Bash(env)",
+      "Bash(gh auth *)",
+      "Bash(git ls-remote *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N \"\" -C \"claude-galaxis-poc-$\\(date +%Y%m%d\\)\" -q)",
+      "Bash(chmod 600 ~/.ssh/id_ed25519)",
+      "Bash(chmod 644 ~/.ssh/id_ed25519.pub)",
+      "Bash(ssh-keygen -lf ~/.ssh/id_ed25519.pub)",
+      "Bash(mkdir -p ~/.ssh)",
+      "Bash(chmod 600 ~/.ssh/config)",
+      "Bash(git fetch *)"
     ]
   }
 }
