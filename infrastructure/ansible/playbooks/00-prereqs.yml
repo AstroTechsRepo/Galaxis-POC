@@ -1,0 +1,173 @@
+---
+# ============================================================
+# Galaxis POC — Playbook 00 : Pré-requis VM Debian 12/13
+# Idempotent. Sûr à rejouer.
+# ============================================================
+- name: "Galaxis POC — pré-requis VM"
+  hosts: galaxis_vm
+  become: true
+  gather_facts: true
+
+  vars:
+    docker_repo_distro: "{{ ansible_distribution | lower }}"
+    docker_repo_codename: "{{ ansible_distribution_release }}"
+
+  tasks:
+
+    # ---- Mise à jour de l'index APT
+    - name: "APT — refresh + paquets de base"
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - git
+          - ufw
+          - fail2ban
+          - unattended-upgrades
+          - htop
+          - jq
+        state: present
+
+    # ---- Swap 2GB si la VM en manque
+    - name: "Swap — créer /swapfile si absent"
+      block:
+        - name: "Détection swap actif"
+          ansible.builtin.command: swapon --show
+          register: swap_state
+          changed_when: false
+          failed_when: false
+
+        - name: "Allouer /swapfile (2G)"
+          ansible.builtin.command: fallocate -l 2G /swapfile
+          args:
+            creates: /swapfile
+          when: swap_state.stdout | length == 0
+
+        - name: "Permissions /swapfile"
+          ansible.builtin.file:
+            path: /swapfile
+            owner: root
+            group: root
+            mode: "0600"
+          when: swap_state.stdout | length == 0
+
+        - name: "mkswap + swapon /swapfile"
+          ansible.builtin.shell: |
+            mkswap /swapfile && swapon /swapfile
+          when: swap_state.stdout | length == 0
+          register: swap_setup
+          changed_when: "'Setting up swapspace' in swap_setup.stdout"
+
+        - name: "Persister swap dans /etc/fstab"
+          ansible.posix.mount:
+            path: none
+            src: /swapfile
+            fstype: swap
+            opts: sw
+            state: present
+          when: swap_state.stdout | length == 0
+
+    # ---- Pare-feu UFW : autoriser SSH uniquement (le port 8080 ne sort PAS)
+    - name: "UFW — règles de base"
+      community.general.ufw:
+        rule: "{{ item.rule }}"
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+      loop:
+        - { rule: "allow", port: "22",   proto: "tcp" }
+      tags: firewall
+
+    - name: "UFW — politique par défaut deny incoming, allow outgoing"
+      community.general.ufw:
+        direction: "{{ item.dir }}"
+        policy: "{{ item.pol }}"
+      loop:
+        - { dir: "incoming", pol: "deny" }
+        - { dir: "outgoing", pol: "allow" }
+      tags: firewall
+
+    - name: "UFW — enable"
+      community.general.ufw:
+        state: enabled
+      tags: firewall
+
+    # ---- Fail2ban : SSH brute force
+    - name: "Fail2ban — service activé"
+      ansible.builtin.service:
+        name: fail2ban
+        enabled: true
+        state: started
+
+    # ---- Docker Engine (depuis le repo officiel Docker)
+    - name: "Docker — répertoire keyring"
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: "Docker — clé GPG officielle"
+      ansible.builtin.get_url:
+        url: "https://download.docker.com/linux/{{ docker_repo_distro }}/gpg"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+        force: false
+
+    - name: "Docker — ajouter le repo APT"
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ ansible_architecture | replace('x86_64','amd64') }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/{{ docker_repo_distro }} {{ docker_repo_codename }} stable"
+        filename: docker
+        state: present
+        update_cache: true
+
+    - name: "Docker — installer Engine + Compose plugin"
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: "Docker — service activé"
+      ansible.builtin.service:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: "Docker — ajouter l'utilisateur au groupe docker"
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: true
+
+    # ---- Arborescence projet
+    - name: "Arborescence — créer {{ galaxis_app_dir }}"
+      ansible.builtin.file:
+        path: "{{ galaxis_app_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+
+    # ---- Code source (git clone, idempotent)
+    - name: "Code source — clone ou pull du repo Galaxis"
+      ansible.builtin.git:
+        repo: "{{ galaxis_git_repo }}"
+        dest: "{{ galaxis_app_dir }}"
+        version: "{{ galaxis_git_branch | default('main') }}"
+        update: true
+      become_user: "{{ ansible_user }}"
+      tags: code
+
+    - name: "Pré-requis OK — résumé"
+      ansible.builtin.debug:
+        msg: |
+          Galaxis prereqs OK :
+            - Docker {{ ansible_facts.packages['docker-ce'][0].version | default('installé') }}
+            - swap, ufw, fail2ban actifs
+            - code cloné dans {{ galaxis_app_dir }}

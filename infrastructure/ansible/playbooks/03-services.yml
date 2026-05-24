@@ -1,0 +1,46 @@
+---
+# ============================================================
+# Galaxis POC — Playbook 03 : stack SERVICES (Vault + Cloud)
+# Idempotent. Déploie le reverse proxy Caddy à la fin.
+# ============================================================
+- name: "Galaxis POC — stack SERVICES + PROXY"
+  hosts: galaxis_vm
+  become: true
+  gather_facts: false
+
+  vars:
+    services_dir: "{{ galaxis_app_dir }}/deployments/services"
+    proxy_dir:    "{{ galaxis_app_dir }}/deployments/proxy"
+
+  tasks:
+
+    - name: "SERVICES — docker compose up -d"
+      ansible.builtin.command:
+        cmd: docker compose --env-file {{ galaxis_app_dir }}/.env up -d
+        chdir: "{{ services_dir }}"
+      register: services_up
+      changed_when: "'Started' in services_up.stderr or 'Created' in services_up.stderr"
+
+    - name: "PROXY — docker compose up -d Caddy"
+      ansible.builtin.command:
+        cmd: docker compose --env-file {{ galaxis_app_dir }}/.env up -d
+        chdir: "{{ proxy_dir }}"
+      register: proxy_up
+      changed_when: "'Started' in proxy_up.stderr or 'Created' in proxy_up.stderr"
+
+    - name: "PROXY — smoke test : http://127.0.0.1:8080/"
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8080/
+        status_code: [200, 302, 304]
+        return_content: false
+      retries: 10
+      delay: 3
+      register: smoke
+      until: smoke.status in [200, 302, 304]
+
+    - name: "SMOKE — résumé"
+      ansible.builtin.debug:
+        msg: |
+          Galaxis prêt sur 127.0.0.1:8080.
+          Démo : ssh -L 8080:127.0.0.1:8080 {{ ansible_user }}@{{ ansible_host }}
+          puis ouvrir http://localhost:8080 dans le navigateur.

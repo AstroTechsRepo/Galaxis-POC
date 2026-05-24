@@ -1,0 +1,52 @@
+---
+# ============================================================
+# Galaxis POC — Playbook 02 : stack APP (Laravel + React)
+# Idempotent. Lance les migrations à la fin.
+# ============================================================
+- name: "Galaxis POC — stack APP"
+  hosts: galaxis_vm
+  become: true
+  gather_facts: false
+
+  vars:
+    stack_dir: "{{ galaxis_app_dir }}/deployments/app"
+
+  tasks:
+
+    - name: "APP — docker compose build (frontend + backend)"
+      ansible.builtin.command:
+        cmd: docker compose --env-file {{ galaxis_app_dir }}/.env build
+        chdir: "{{ stack_dir }}"
+      register: build_out
+      changed_when: "'Building' in build_out.stderr or 'naming to' in build_out.stderr"
+
+    - name: "APP — docker compose up -d"
+      ansible.builtin.command:
+        cmd: docker compose --env-file {{ galaxis_app_dir }}/.env up -d
+        chdir: "{{ stack_dir }}"
+      register: up_out
+      changed_when: "'Started' in up_out.stderr or 'Created' in up_out.stderr"
+
+    - name: "APP — attendre que app-php soit reachable"
+      ansible.builtin.shell: |
+        for i in $(seq 1 30); do
+          if docker exec galaxis-app-php php -r 'exit(0);' >/dev/null 2>&1; then exit 0; fi
+          sleep 2
+        done
+        exit 1
+      changed_when: false
+
+    - name: "APP — migrations (php artisan migrate --force)"
+      ansible.builtin.command: docker exec galaxis-app-php php artisan migrate --force --no-interaction
+      register: mig
+      changed_when: "'Running:' in mig.stdout or 'Migrated' in mig.stdout"
+
+    - name: "APP — cache config + routes (prod)"
+      ansible.builtin.shell: |
+        docker exec galaxis-app-php php artisan config:cache
+        docker exec galaxis-app-php php artisan route:cache
+      changed_when: false
+
+    - name: "APP — résumé"
+      ansible.builtin.debug:
+        msg: "Stack APP déployée. Migrations OK. Caches OK."
