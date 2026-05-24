@@ -4,6 +4,43 @@ Toutes les évolutions notables du projet Galaxis POC. Le format suit [Keep a Ch
 
 ---
 
+## [v1.1-conteneurise] — 2026-05-24
+
+### 🐳 Phase C — Architecture 100% conteneurisée alignée slides
+
+Refactor majeur de la couche infra pour se conformer strictement aux slides de soutenance (10, 12, 13, 15, A01).
+
+#### Changed (breaking)
+
+- **docker-compose.yml** : réécriture complète → **11 conteneurs running** + 1 conteneur one-shot `frontend-builder`. Remplace l'ancien compose avec Caddy unique + HTTP.
+- **3 Caddy frontaux** (un par tier) avec `tls internal` (CA Caddy locale, certs auto-générés persistés dans volumes nommés) : `caddy-iam`, `app-caddy`, `caddy-services`
+- **HTTPS partout** via CA Caddy locale (ports loopback `127.0.0.1:8443/9443/10443/11443`)
+- **Keycloak v26** (upgrade depuis 25.0), exposé derrière `caddy-iam` avec `KC_PROXY=edge`, `KC_HOSTNAME_PORT=8443`
+- **React = build statique** dans le volume `galaxis-frontend-build`, servi par `app-caddy` (plus de conteneur React running)
+- **backend/Dockerfile** : multi-stage composer + php:8.3-fpm-alpine (plus de nginx/supervisord embarqués)
+- **frontend/Dockerfile** : multi-stage node build → alpine rsync → volume nommé
+- **scripts/bootstrap.sh** : orchestre wait-keycloak + configure-keycloak + migrate + seed (idempotent)
+- **Makefile** : refait pour Phase C avec targets `up`, `demo`, `bootstrap`, `nuke`, `ca`, etc.
+- **configure-keycloak.sh** : URLs par défaut `https://localhost:8443` et `https://localhost:9443`, support `CURL_INSECURE=1` pour CA locale
+- **Frontend oidc.ts** : authority = `VITE_KC_URL/realms/galaxis` (URL absolue, plus de sous-chemin `/iam`)
+- **Laravel config** : `oidc.base_internal` = `http://keycloak:8080` (sans `/iam`), `cors` = `https://localhost:9443`
+
+#### Removed
+
+- Ancien `Caddyfile` racine unique + `frontend/Caddyfile`
+- Anciens compose split `deployments/{iam,app,services,proxy}/docker-compose.yml`
+- nginx.conf + supervisord.conf embarqués dans le backend Dockerfile
+
+#### Unchanged (réutilisé tel quel)
+
+- Code applicatif Laravel (middleware JWT, services, contrôleurs, modèles, migrations, seeders)
+- Code applicatif React (composants, pages, hooks, styles, DA tokens)
+- Playbooks Ansible (`00-prereqs` reste utile pour préparer une VM)
+- 3 documentations livrables (technique, projet, utilisateur) — mises à jour pour refléter la nouvelle archi
+- Factories, DemoSeeder, tests Pest, tests Vitest
+
+---
+
 ## [v1.0-soutenance] — 2026-05-24
 
 ### 🚀 Version POC livrable au jury ESGI

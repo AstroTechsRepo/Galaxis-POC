@@ -3,13 +3,13 @@
 > **One core. Infinite orbits.**
 > L'orchestrateur souverain de votre écosystème open source — POC réalisé par Lucas PEREZ (ESGI 2 · Campus Éductive · 2025/2026), édité par AstroTechs.
 
-[![Version](https://img.shields.io/badge/version-v1.0--soutenance-7B3E97)](#) [![License](https://img.shields.io/badge/licence-proprietary-127DC2)](#) [![Stack](https://img.shields.io/badge/stack-Laravel%2011%20%2B%20React%2018%20%2B%20Keycloak%2025-07A9DD)](#)
+[![Version](https://img.shields.io/badge/version-v1.1--conteneurise-7B3E97)](#) [![License](https://img.shields.io/badge/licence-proprietary-127DC2)](#) [![Stack](https://img.shields.io/badge/stack-Laravel%2011%20%2B%20React%2018%20%2B%20Keycloak%2026%20%2B%203%20Caddy%20HTTPS-07A9DD)](#)
 
 ---
 
 ## ✨ En une phrase
 
-Galaxis déploie sur **une seule VM Debian**, en **une seule commande**, un **portail unifié** qui orchestre une IAM (Keycloak), un coffre-fort de mots de passe (Vaultwarden) et un drive collaboratif (Nextcloud) — le tout en **open source souverain**, accessible via un **seul tunnel SSH** pour la démo.
+Galaxis déploie sur **une seule VM Debian**, en **une seule commande**, **11 conteneurs Docker** organisés en **3 réseaux isolés** avec **HTTPS** (CA Caddy locale) — un portail unifié qui orchestre une IAM (Keycloak 26), un coffre-fort de mots de passe (Vaultwarden) et un drive collaboratif (Nextcloud), le tout en **open source souverain**, accessible via **tunnel SSH** pour la démo.
 
 ---
 
@@ -18,7 +18,7 @@ Galaxis déploie sur **une seule VM Debian**, en **une seule commande**, un **po
 ### Sur la VM (déploiement initial)
 
 ```bash
-git clone <repo>.git Galaxis-POC && cd Galaxis-POC
+git clone git@github.com:AstroTechsRepo/Galaxis-POC.git && cd Galaxis-POC
 cp .env.example .env && $EDITOR .env   # remplacez tous les change-me-*
 make demo
 ```
@@ -26,20 +26,25 @@ make demo
 ### Sur le laptop (à chaque démo)
 
 ```bash
-ssh -L 8080:127.0.0.1:8080 user@<VM_IP>
+ssh -L 8443:127.0.0.1:8443 \
+    -L 9443:127.0.0.1:9443 \
+    -L 10443:127.0.0.1:10443 \
+    -L 11443:127.0.0.1:11443 \
+    user@<VM_IP>
 ```
 
-### Sur le laptop, ouvrir le navigateur
+### Ouvrir dans le navigateur du laptop
 
-```
-http://localhost:8080
-```
+| URL | Brique |
+|---|---|
+| **`https://localhost:9443`** | Portail Galaxis (entry point) |
+| `https://localhost:8443` | Keycloak admin |
+| `https://localhost:10443` | Vaultwarden |
+| `https://localhost:11443` | Nextcloud |
 
-C'est **tout**.
-
-- ✅ Pas de certificat à importer
 - ✅ Pas de modification `/etc/hosts`
-- ✅ Pas de warning navigateur
+- ✅ HTTPS via CA Caddy locale (warning au premier accès : cliquer *avancer* — attendu pour un POC)
+- ✅ Aucune installation supplémentaire sur le laptop
 
 Connectez-vous avec **`marc / Demo2026!`** (le persona principal — cf. slide 05) et explorez votre orbite.
 
@@ -49,13 +54,13 @@ Connectez-vous avec **`marc / Demo2026!`** (le persona principal — cf. slide 0
 
 ## 🛰️ Ce que vous verrez
 
-1. **Landing page Galaxis** : fond espace, gradient bleu→violet, tagline *One core. Infinite orbits.*
-2. **Login OIDC PKCE** : redirection vers Keycloak, page login, retour authentifié
-3. **Dashboard** : *Bienvenue, Lucas* + 3 cartes briques (Vaultwarden, Nextcloud, VPN à venir) + tableau des claims du JWT décodés
-4. **Profile** : session OIDC + journal d'audit des connexions
-5. **Vaultwarden** sur `/vault/` : coffre-fort de mots de passe
-6. **Nextcloud** sur `/cloud/` : drive collaboratif
-7. **Keycloak admin** sur `/iam/admin` : pour créer / désactiver des comptes
+1. **Landing page Galaxis** (`https://localhost:9443`) : fond espace, gradient bleu→violet, tagline *One core. Infinite orbits.*
+2. **Login OIDC PKCE** : redirection vers Keycloak (`https://localhost:8443`), login `marc / Demo2026!`, retour authentifié
+3. **Dashboard** : *Bienvenue, Marc* + 3 cartes briques + tableau des claims JWT décodés côté serveur
+4. **Profil** : session OIDC + journal d'audit (~24 entrées seedées)
+5. **Vaultwarden** (`https://localhost:10443`) : coffre-fort de mots de passe
+6. **Nextcloud** (`https://localhost:11443`) : drive collaboratif
+7. **Keycloak admin** (`https://localhost:8443/admin`) : pour créer / désactiver des comptes
 
 ---
 
