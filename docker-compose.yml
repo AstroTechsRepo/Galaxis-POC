@@ -81,7 +81,7 @@ services:
       keycloak:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://localhost/"]
+      test: ["CMD-SHELL", "curl -fksS https://localhost/ -o /dev/null || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 5
@@ -104,14 +104,12 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?KC_ADMIN_PASSWORD requis}
       # Configuration derrière reverse proxy Caddy
       KC_PROXY: edge
-      KC_HOSTNAME: localhost
-      KC_HOSTNAME_PORT: 8443
+      KC_HOSTNAME: "https://localhost:8443"
       KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
-    command: ["start", "--optimized"]
+    command: ["start"]
     networks: [galaxis-iam-net]
     healthcheck:
       # /health/ready est exposé sur le port management 9000 (Keycloak 25+)
@@ -165,7 +163,7 @@ services:
       frontend-builder:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://localhost/"]
+      test: ["CMD-SHELL", "curl -fksS https://localhost/ -o /dev/null || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 5
@@ -208,8 +206,8 @@ services:
       KC_BASE_PUBLIC: ${KC_BASE_PUBLIC:-https://localhost:8443}
       KC_CLIENT_ID: ${KC_CLIENT_ID:-galaxis-portal}
       JWKS_CACHE_TTL: 300
-    volumes:
-      - ./backend:/var/www/html
+    # Pas de bind mount en mode démo/prod : l'image contient le vendor + le code.
+    # Pour le dev local (hot reload), ajouter : `volumes: ["./backend:/var/www/html"]`
     # ⚡ app-php est le seul service MULTI-RÉSEAU : pont JWT (cf. slide 12)
     networks: [galaxis-app-net, galaxis-iam-net]
     healthcheck:
@@ -297,7 +295,7 @@ services:
       nextcloud:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://localhost/"]
+      test: ["CMD-SHELL", "curl -fksS https://localhost/ -o /dev/null || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 5
@@ -318,7 +316,7 @@ services:
       - vaultwarden-data:/data
     networks: [galaxis-services-net]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/alive"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:80/alive || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 5

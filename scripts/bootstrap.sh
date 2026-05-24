@@ -26,7 +26,7 @@ if [ -f "${ROOT_DIR}/.env" ]; then
 fi
 
 # Endpoint de health Keycloak — exposé par caddy-iam en HTTPS sur 8443
-KC_HEALTH_URL="${KC_HEALTH_URL:-https://localhost:8443/health/ready}"
+KC_HEALTH_URL="${KC_HEALTH_URL:-https://localhost:8443/realms/master}"
 MAX_WAIT="${MAX_WAIT:-240}"
 DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose}"
 
