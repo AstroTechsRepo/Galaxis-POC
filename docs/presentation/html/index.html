@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Galaxis — Soutenance 2025/2026 — Lucas PEREZ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  /* ============================================================
+     Galaxis — Présentation unifiée
+     Navigation clavier + télécommande + overview
+     ============================================================ */
+
+  :root {
+    --space-deep: #0D0B1A;
+    --violet-glow: #A76EC8;
+    --violet-mid: #7B3E97;
+    --blue-glow: #60D5FF;
+    --blue-light: #07A9DD;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #fff;
+  }
+
+  /* === IFRAME : la slide active prend tout l'écran === */
+  .slide-frame {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    border: 0;
+    background: var(--space-deep);
+    z-index: 1;
+  }
+
+  /* === OVERVIEW : grille de miniatures === */
+  .overview {
+    position: fixed;
+    inset: 0;
+    background: rgba(13, 11, 26, 0.97);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    overflow-y: auto;
+    padding: 32px 48px;
+    display: none;
+  }
+  .overview.active { display: block; }
+
+  .overview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(167, 110, 200, 0.20);
+  }
+  .overview-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 24px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #60D5FF 0%, #A76EC8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .overview-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.05em;
+  }
+  .overview-hint kbd {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(167, 110, 200, 0.15);
+    border: 1px solid rgba(167, 110, 200, 0.40);
+    border-radius: 4px;
+    margin: 0 2px;
+    color: var(--violet-glow);
+    font-family: inherit;
+    font-size: 10px;
+  }
+
+  .overview-section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--violet-glow);
+    margin: 24px 0 12px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed rgba(167, 110, 200, 0.20);
+  }
+
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+  .overview-grid.annex {
+    grid-template-columns: repeat(5, 1fr);
+    /* Garder le même grid pour cohérence visuelle avec la grille principale */
+  }
+
+  .thumb {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: var(--space-deep);
+    border: 2px solid rgba(167, 110, 200, 0.25);
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .thumb:hover { border-color: var(--blue-glow); transform: translateY(-2px); }
+  .thumb.current { border-color: var(--violet-glow) !important; box-shadow: 0 0 0 2px rgba(167, 110, 200, 0.30); }
+  .thumb.current:hover { border-color: var(--violet-glow) !important; }
+  .thumb-iframe {
+    position: absolute;
+    top: 0; left: 0;
+    width: 960px;
+    height: 540px;
+    border: 0;
+    transform-origin: top left;
+    /* scale will be set inline via JS after measuring thumb width */
+    pointer-events: none;
+  }
+  .thumb-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 6px 10px;
+    background: linear-gradient(0deg, rgba(13, 11, 26, 0.95) 0%, transparent 100%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.85);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .thumb-num {
+    font-weight: 600;
+    color: var(--blue-glow);
+    flex-shrink: 0;
+  }
+  .thumb-title {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.65);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  /* === INDICATOR : flash de transition === */
+  .nav-flash {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 16px;
+    background: rgba(13, 11, 26, 0.90);
+    border: 1px solid rgba(167, 110, 200, 0.40);
+    border-radius: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--violet-glow);
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 50;
+  }
+  .nav-flash.show { opacity: 1; }
+
+  /* === SPLASH initial === */
+  .splash {
+    position: fixed;
+    inset: 0;
+    background: var(--space-deep);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    text-align: center;
+    transition: opacity 0.5s;
+  }
+  .splash.hidden { opacity: 0; pointer-events: none; }
+  .splash-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 48px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #60D5FF 0%, #A76EC8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: -0.02em;
+  }
+  .splash-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.65);
+    max-width: 400px;
+    line-height: 1.6;
+  }
+  .splash-controls {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 600px;
+  }
+  .splash-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(167, 110, 200, 0.08);
+    border: 1px solid rgba(167, 110, 200, 0.30);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.80);
+  }
+  .splash-ctrl kbd {
+    padding: 1px 6px;
+    background: rgba(167, 110, 200, 0.20);
+    border-radius: 3px;
+    color: var(--violet-glow);
+    font-family: inherit;
+  }
+  .splash-action {
+    margin-top: 16px;
+    padding: 10px 28px;
+    background: linear-gradient(135deg, #60D5FF 0%, #A76EC8 100%);
+    border: none;
+    border-radius: 6px;
+    color: #0D0B1A;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .splash-action:hover { transform: scale(1.04); }
+
+</style>
+</head>
+<body>
+
+  <!-- === Splash écran de démarrage === -->
+  <div class="splash" id="splash">
+    <div class="splash-title">Galaxis</div>
+    <div class="splash-sub">Soutenance — Lucas PEREZ — ESGI 2 — Campus Éductive — 2025 / 2026</div>
+    <div class="splash-controls">
+      <div class="splash-ctrl"><kbd>→</kbd> ou <kbd>Espace</kbd> Suivante</div>
+      <div class="splash-ctrl"><kbd>←</kbd> Précédente</div>
+      <div class="splash-ctrl"><kbd>O</kbd> Vue d'ensemble</div>
+      <div class="splash-ctrl"><kbd>F</kbd> Plein écran</div>
+      <div class="splash-ctrl"><kbd>B</kbd> Écran noir</div>
+    </div>
+    <button class="splash-action" onclick="startPresentation()">Commencer ▶</button>
+  </div>
+
+  <!-- === Iframe principale === -->
+  <iframe class="slide-frame" id="slideFrame" src="slides/01.html"></iframe>
+
+  <!-- === Indicateur de transition === -->
+  <div class="nav-flash" id="navFlash">01 / 15</div>
+
+  <!-- === Overview === -->
+  <div class="overview" id="overview">
+    <div class="overview-header">
+      <div class="overview-title">Galaxis · Vue d'ensemble</div>
+      <div class="overview-hint">
+        Cliquer sur une slide · <kbd>O</kbd>/<kbd>Esc</kbd> Fermer · <kbd>←</kbd>/<kbd>→</kbd> Naviguer
+      </div>
+    </div>
+
+    <div class="overview-section-label">Présentation · 15 slides</div>
+    <div class="overview-grid" id="grid-main"></div>
+
+    <div class="overview-section-label">Annexes · pour les questions du jury</div>
+    <div class="overview-grid annex" id="grid-annex"></div>
+  </div>
+
+<script>
+'use strict';
+
+// ============================================================
+// Configuration : titres et liste de slides
+// ============================================================
+const SLIDES = [
+  { num: 1,  title: 'Couverture' },
+  { num: 2,  title: 'AstroTechs' },
+  { num: 3,  title: 'Enquête terrain' },
+  { num: 4,  title: 'Persona Marc' },
+  { num: 5,  title: 'Rôles' },
+  { num: 6,  title: 'Notre proposition' },
+  { num: 7,  title: 'Périmètre' },
+  { num: 8,  title: 'Archi fonctionnelle POC' },
+  { num: 9,  title: 'Archi fonctionnelle cible' },
+  { num: 10, title: 'Archi technique POC' },
+  { num: 11, title: 'Archi cible AWS' },
+  { num: 12, title: 'Focus JWT' },
+  { num: 13, title: 'Démonstration' },
+  { num: 14, title: 'Tests et difficultés' },
+  { num: 15, title: 'Conclusion' },
+];
+const ANNEXES = [
+  { num: 'A01', label: 'A1', title: 'Courbe de charge' },
+  { num: 'A02', label: 'A2', title: 'Pilotage du projet (Kanban)' },
+  { num: 'A03', label: 'A3', title: 'Consultations & interlocuteurs' },
+  { num: 'A04', label: 'A4', title: 'Matrice des risques' },
+  { num: 'A05', label: 'A5', title: 'Flux POC détaillés' },
+  { num: 'A06', label: 'A6', title: 'Validation JWT (code)' },
+  { num: 'A07', label: 'A7', title: 'Flow OIDC Auth Code + PKCE' },
+  { num: 'A08', label: 'A8', title: 'Comparatif IdP open-source' },
+  { num: 'A09', label: 'A9', title: 'Business model SaaS' },
+];
+const ALL_SLIDES = [...SLIDES, ...ANNEXES];
+
+// ============================================================
+// État
+// ============================================================
+let currentIndex = 0;        // 0..14 dans la séquence principale
+let isOverview = false;
+let isBlack = false;
+let presentationStarted = false;
+
+// Mode annexe : quand on consulte une annexe, on bascule dans une boucle restreinte
+// aux annexes. Les flèches naviguent entre annexes. Pour retourner au parcours
+// principal, ouvrir l'overview et cliquer sur une slide principale.
+let isAnnexMode = false;
+let currentAnnexIndex = 0;   // 0..ANNEXES.length-1 quand isAnnexMode === true
+
+const frame     = document.getElementById('slideFrame');
+const overview  = document.getElementById('overview');
+const splash    = document.getElementById('splash');
+const flash     = document.getElementById('navFlash');
+
+// ============================================================
+// Helpers
+// ============================================================
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function slideUrl(numOrId) {
+  // Si c'est un string commençant par 'A' (ex: 'A01'), on utilise tel quel
+  // Si c'est un nombre, on pad sur 2 chiffres (ex: 3 → '03')
+  if (typeof numOrId === 'string') {
+    return `slides/${numOrId}.html`;
+  }
+  return `slides/${pad(numOrId)}.html`;
+}
+
+function labelOf(slide) {
+  // Retourne le label à afficher : "A1" pour annexes (depuis .label), "03" pour slides numériques
+  if (slide.label) return slide.label;
+  return pad(slide.num);
+}
+
+function injectIframedClass(iframeEl) {
+  // Ajoute la classe "iframed" sur le body de la slide chargée
+  // pour activer les règles CSS plein-écran injectées dans chaque slide
+  try {
+    const doc = iframeEl.contentDocument;
+    if (doc && doc.body) {
+      doc.body.classList.add('iframed');
+    }
+  } catch (e) {
+    // cross-origin (peu probable en file://) — pas grave
+  }
+}
+
+// ============================================================
+// Navigation
+// ============================================================
+function showSlide(idx) {
+  if (idx < 0 || idx >= SLIDES.length) return;
+  currentIndex = idx;
+  isAnnexMode = false;        // toute navigation vers le principal sort du mode annexe
+  const slide = SLIDES[idx];
+  frame.src = slideUrl(slide.num);
+  showFlash();
+  updateOverviewHighlight();
+}
+
+function showAnnex(annexIdx) {
+  if (annexIdx < 0 || annexIdx >= ANNEXES.length) return;
+  currentAnnexIndex = annexIdx;
+  isAnnexMode = true;
+  const annex = ANNEXES[annexIdx];
+  frame.src = slideUrl(annex.num);
+  showFlashAnnex(annex.num);
+  updateOverviewHighlight();
+}
+
+function goToAnyByNum(num) {
+  // Pour navigation depuis overview (peut être annexe ou slide principale)
+  const idxMain = SLIDES.findIndex(s => s.num === num);
+  if (idxMain >= 0) {
+    showSlide(idxMain);
+  } else {
+    // Annexe : on bascule en mode annexe
+    const idxAnnex = ANNEXES.findIndex(a => a.num === num);
+    if (idxAnnex >= 0) {
+      showAnnex(idxAnnex);
+    }
+  }
+  closeOverview();
+}
+
+function next() {
+  if (isAnnexMode) {
+    // Navigation entre annexes uniquement, sans déborder
+    if (currentAnnexIndex < ANNEXES.length - 1) {
+      showAnnex(currentAnnexIndex + 1);
+    }
+  } else {
+    if (currentIndex < SLIDES.length - 1) {
+      showSlide(currentIndex + 1);
+    }
+  }
+}
+
+function prev() {
+  if (isAnnexMode) {
+    if (currentAnnexIndex > 0) {
+      showAnnex(currentAnnexIndex - 1);
+    }
+  } else {
+    if (currentIndex > 0) {
+      showSlide(currentIndex - 1);
+    }
+  }
+}
+
+function first() {
+  if (isAnnexMode) {
+    showAnnex(0);
+  } else {
+    showSlide(0);
+  }
+}
+function last() {
+  if (isAnnexMode) {
+    showAnnex(ANNEXES.length - 1);
+  } else {
+    showSlide(SLIDES.length - 1);
+  }
+}
+
+// ============================================================
+// Flash indicator (court, ne s'affiche que pendant la navigation au clavier)
+// ============================================================
+let flashTimer = null;
+function showFlash() {
+  flash.textContent = `${pad(currentIndex + 1)} / ${SLIDES.length}`;
+  flash.classList.add('show');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => flash.classList.remove('show'), 800);
+}
+function showFlashAnnex(numOrId) {
+  const idx = ANNEXES.findIndex(a => a.num === numOrId);
+  const annex = ANNEXES[idx];
+  const label = annex ? annex.label : numOrId;
+  const pos = idx >= 0 ? `${idx + 1} / ${ANNEXES.length}` : '';
+  flash.textContent = `Annexe ${label}${pos ? ' · ' + pos : ''}`;
+  flash.classList.add('show');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => flash.classList.remove('show'), 1200);
+}
+
+// ============================================================
+// Overview
+// ============================================================
+function openOverview() {
+  if (!presentationStarted) return;
+  overview.classList.add('active');
+  isOverview = true;
+  updateOverviewHighlight();
+}
+
+function closeOverview() {
+  overview.classList.remove('active');
+  isOverview = false;
+}
+
+function toggleOverview() {
+  isOverview ? closeOverview() : openOverview();
+}
+
+function updateOverviewHighlight() {
+  // En mode annexe : on highlight l'annexe courante
+  // En mode normal : on highlight la slide principale courante
+  const currentNum = isAnnexMode
+    ? ANNEXES[currentAnnexIndex].num
+    : SLIDES[currentIndex].num;
+  document.querySelectorAll('.thumb').forEach(el => {
+    // dataset.num est toujours une string : on compare en string
+    const num = el.dataset.num;
+    el.classList.toggle('current', num === String(currentNum));
+  });
+}
+
+function buildOverviewGrid() {
+  const mainGrid  = document.getElementById('grid-main');
+  const annexGrid = document.getElementById('grid-annex');
+
+  for (const slide of SLIDES) {
+    mainGrid.appendChild(makeThumb(slide));
+  }
+  for (const slide of ANNEXES) {
+    annexGrid.appendChild(makeThumb(slide));
+  }
+}
+
+function makeThumb(slide) {
+  const thumb = document.createElement('div');
+  thumb.className = 'thumb';
+  thumb.dataset.num = slide.num;
+  thumb.onclick = () => goToAnyByNum(slide.num);
+
+  const iframe = document.createElement('iframe');
+  iframe.className = 'thumb-iframe';
+  iframe.src = slideUrl(slide.num);
+  // pas de lazy : on veut TOUTES les miniatures rendues
+  // (sinon scroll → flash de chargement)
+
+  const overlay = document.createElement('div');
+  overlay.className = 'thumb-overlay';
+  overlay.innerHTML = `
+    <span class="thumb-num">${labelOf(slide)}</span>
+    <span class="thumb-title">${slide.title}</span>
+  `;
+
+  thumb.appendChild(iframe);
+  thumb.appendChild(overlay);
+  
+  // Appliquer le scale après que la thumb soit dans le DOM
+  requestAnimationFrame(() => {
+    applyThumbScale(thumb, iframe);
+  });
+  
+  return thumb;
+}
+
+function applyThumbScale(thumb, iframe) {
+  const w = thumb.clientWidth;
+  if (w === 0) {
+    // Pas encore mesurable, réessayer plus tard
+    requestAnimationFrame(() => applyThumbScale(thumb, iframe));
+    return;
+  }
+  const scale = w / 960;
+  iframe.style.transform = `scale(${scale})`;
+}
+
+// ============================================================
+// Plein écran + écran noir
+// ============================================================
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+function toggleBlack() {
+  isBlack = !isBlack;
+  frame.style.visibility = isBlack ? 'hidden' : 'visible';
+}
+
+// ============================================================
+// Démarrage
+// ============================================================
+function startPresentation() {
+  splash.classList.add('hidden');
+  presentationStarted = true;
+  setTimeout(() => splash.style.display = 'none', 500);
+  // Demande plein écran automatique
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {
+      // Si le navigateur refuse (config user), on continue sans
+    });
+  }
+}
+
+// ============================================================
+// Listeners clavier
+// ============================================================
+document.addEventListener('keydown', (e) => {
+  // Avant le démarrage : seuls Entrée / Espace lancent
+  if (!presentationStarted) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      startPresentation();
+    }
+    return;
+  }
+
+  // En overview : Esc/O ferme, flèches naviguent puis ferment
+  if (isOverview) {
+    if (e.key === 'Escape' || e.key.toLowerCase() === 'o') {
+      e.preventDefault();
+      closeOverview();
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+      e.preventDefault();
+      next();
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault();
+      prev();
+      return;
+    }
+    return;
+  }
+
+  // En mode présentation
+  switch (e.key) {
+    case 'ArrowRight':
+    case 'PageDown':
+    case ' ':
+      e.preventDefault();
+      next();
+      break;
+    case 'ArrowLeft':
+    case 'PageUp':
+      e.preventDefault();
+      prev();
+      break;
+    case 'Home':
+      e.preventDefault();
+      first();
+      break;
+    case 'End':
+      e.preventDefault();
+      last();
+      break;
+    case 'o':
+    case 'O':
+      e.preventDefault();
+      toggleOverview();
+      break;
+    case 'Escape':
+      e.preventDefault();
+      openOverview();
+      break;
+    case 'f':
+    case 'F':
+      e.preventDefault();
+      toggleFullscreen();
+      break;
+    case 'b':
+    case 'B':
+    case '.':
+      e.preventDefault();
+      toggleBlack();
+      break;
+  }
+});
+
+// ============================================================
+// Init
+// ============================================================
+frame.addEventListener('load', () => {
+  injectIframedClass(frame);
+});
+
+buildOverviewGrid();
+
+// Recalcul des scales miniatures si la fenêtre change
+window.addEventListener('resize', () => {
+  document.querySelectorAll('.thumb').forEach(thumb => {
+    const iframe = thumb.querySelector('iframe');
+    if (iframe) applyThumbScale(thumb, iframe);
+  });
+});
+
+// Si l'utilisateur quitte le plein écran via Esc système (navigateur),
+// on n'ouvre PAS l'overview automatiquement (Esc reste un raccourci app)
+document.addEventListener('fullscreenchange', () => {});
+
+</script>
+</body>
+</html>
