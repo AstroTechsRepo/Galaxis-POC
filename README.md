@@ -1,7 +1,7 @@
 # Galaxis POC
 
 > **One core. Infinite orbits.**
-> L'orchestrateur souverain de votre ecosysteme open source — POC realise par Lucas PEREZ (ESGI 2 - Campus Educative - 2025/2026), edite par AstroTechs.
+> L'orchestrateur souverain de votre ecosysteme open source — POC realise par Lucas PEREZ (ESGI 2 - Campus Eductive - 2025/2026), edite par AstroTechs.
 
 ---
 
