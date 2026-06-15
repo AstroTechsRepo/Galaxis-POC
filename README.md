@@ -143,7 +143,7 @@ make lint    # Pint + ESLint + Prettier
 
 ## Contact
 
-- **Auteur** : Lucas PEREZ — ESGI 2, Campus Educative
+- **Auteur** : Lucas PEREZ — ESGI 2, Campus Eductive
 - **Soutenance** : 26 juin 2026
 - **Editeur** : AstroTechs
 
